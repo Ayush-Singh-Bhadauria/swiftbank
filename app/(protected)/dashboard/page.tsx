@@ -2,7 +2,6 @@ import { Metadata } from 'next';
 import { AccountSummary } from '@/components/dashboard/account-summary';
 import { QuickActions } from '@/components/dashboard/quick-actions';
 import { NotificationsPanel } from '@/components/dashboard/notifications-panel';
-import { Chatbot } from '@/components/dashboard/chatbot';
 
 export const metadata: Metadata = {
   title: 'Dashboard - SwiftBank',
@@ -63,9 +62,6 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
-
-      {/* Chatbot Assistant */}
-      <Chatbot />
     </div>
   );
 }

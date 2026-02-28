@@ -1,0 +1,13 @@
+{
+	"servers": {
+		"ibm-wxo-adk": {
+			"type": "http",
+			"url": "https://developer.watson-orchestrate.ibm.com/mcp"
+		},
+		"my-mcp-server-7651b4e1": {
+			"url": "https://developer.watson-orchestrate.ibm.com/mcp",
+			"type": "http"
+		}
+	},
+	"inputs": []
+}

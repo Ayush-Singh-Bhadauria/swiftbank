@@ -2,6 +2,7 @@ import { Sidebar } from '@/components/layout/sidebar';
 import { Navbar } from '@/components/layout/navbar';
 import { Footer } from '@/components/layout/footer';
 import { ProtectedRoute } from '@/components/auth/protected-route';
+import { WebchatWidget } from '@/components/chat/webchat-widget';
 
 export default function ProtectedLayout({
   children,
@@ -22,6 +23,8 @@ export default function ProtectedLayout({
           <Footer />
         </div>
       </div>
+      {/* watsonx Orchestrate floating chat widget – visible on all authenticated pages */}
+      <WebchatWidget />
     </ProtectedRoute>
   );
 }

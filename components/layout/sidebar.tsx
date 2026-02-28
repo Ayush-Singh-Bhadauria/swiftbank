@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { Home, CreditCard, User, FileText, LogOut, ArrowUpRight, FileCheck } from 'lucide-react';
+import { Home, CreditCard, User, FileText, LogOut, ArrowUpRight, FileCheck, Headphones, LayoutDashboard } from 'lucide-react';
 import { useAuth } from '@/context/auth-context';
 
 const navItems = [
@@ -15,6 +15,11 @@ const navItems = [
   { href: '/dispute', label: 'Dispute', icon: FileText },
 ];
 
+const agentNavItems = [
+  { href: '/agent-console', label: 'Agent Console', icon: Headphones },
+  { href: '/admin', label: 'Admin / Demo', icon: LayoutDashboard },
+];
+
 export function Sidebar() {
   const pathname = usePathname();
   const { logout } = useAuth();
@@ -24,7 +29,7 @@ export function Sidebar() {
       <div className="p-6">
         <h1 className="text-2xl font-bold text-primary">SwiftBank</h1>
       </div>
-      <nav className="flex-1 space-y-1 px-3">
+      <nav className="flex-1 space-y-1 px-3 overflow-y-auto">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = pathname === item.href;
@@ -44,6 +49,32 @@ export function Sidebar() {
             </Link>
           );
         })}
+
+        {/* Agent & Admin section */}
+        <div className="mt-3 pt-3 border-t border-border">
+          <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Contact Center
+          </p>
+          {agentNavItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = pathname === item.href;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                  isActive
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                )}
+              >
+                <Icon className="h-5 w-5" />
+                {item.label}
+              </Link>
+            );
+          })}
+        </div>
       </nav>
       <div className="border-t p-3">
         <button

@@ -8,3 +8,7 @@ node_modules/
 .next/
 .env*.local
 .DS_Store
+
+# ADK credentials — never commit
+adk-project/.env
+keys/

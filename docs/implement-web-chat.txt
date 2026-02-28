@@ -1,0 +1,382 @@
+Getting started
+Start your agent integration by embedding the chat into your web application and applying the appropriate security settings for your scenario. This getting started guide is designed for developers who want a clear, straightforward path to adding an agent-driven chat experience to a web application.
+If you are looking for an architectural overview of security, see Securing the embedded chat.
+​
+Integrating agents with web applications
+1
+Configure security for embedded chat
+
+Security is enabled by default in both Draft and Live environments but not configured. You must explicitly configure it as described in the Configuring security for embedded chat section. The embedded chat does not initialize unless the required cryptographic keys are configured and validated by the service.
+2
+Generate the embed script
+
+Generate the script to embed the agent with your web application by using the channels webchat embed command.
+If you prefer to generate the script by using the UI, see Embedding the agent to web applications in the watsonx Orchestrate base documentation. The following procedure focuses on the command line-based workflow.
+orchestrate channels webchat embed --agent-name=test_agent1
+Where:
+agent-name
+Assign the name of the agent that you want to get the embed script.
+The previous code outputs a <script> tag with configuration for your environment. You can add this script to an HTML page on your website. The following is an example of the command’s output:
+OUTPUT
+<script>
+  window.wxOConfiguration = {
+    orchestrationID: "your-orgID_orchestrationID", // Adds control over chat display mode (e.g., fullscreen)
+    hostURL: "https://dl.watson-orchestrate.ibm.com", // or region-specific host
+    rootElementID: "root",
+    showLauncher: false,
+    deploymentPlatform: "ibmcloud", // Required for IBM Cloud embed, can be skipped for other embed scenarios
+    crn: "your-org-crn", // Required for IBM Cloud embed, can be skipped for other embed scenarios. For more information, see https://cloud.ibm.com/docs/key-protect?topic=key-protect-retrieve-instance-ID&interface=ui
+    chatOptions: {
+      agentId: "your-agent-id",
+      agentEnvironmentId: "your-agent-env-id",
+    },
+    layout: {
+      form: "fullscreen-overlay", // Options: float | custom | fullscreen-overlay - if not specified float is default
+      showOrchestrateHeader: true, // Optional: shows top agent header bar
+      width: "600px", // Optional: honored when form is float only
+      height: "600px", // Optional: honored when form is float only
+    },
+  };
+
+  setTimeout(function () {
+    const script = document.createElement("script");
+    script.src = `${window.wxOConfiguration.hostURL}/wxochat/wxoLoader.js?embed=true`;
+    script.addEventListener("load", function () {
+      wxoLoader.init();
+    });
+    document.head.appendChild(script);
+  }, 0);
+</script>
+See all 29 lines
+3
+Add the script to your web application
+
+To successfully embed and run the agent within the embedded chat, your application must meet the following requirements:
+Include a server-side component (local or cloud-based)
+A server is required to securely store and use private keys, sign requests, and interact with watsonx Orchestrate APIs.
+Include an HTML root container
+The embedding page must contain an HTML element with the ID root.
+Use HTML strict mode
+The page that embeds the web chat must declare HTML strict mode by including the <!DOCTYPE html> directive.
+Place the embedded script inside the <body> tag to ensure that the DOM is available when the script runs, and that the root element can be resolved correctly at initialization time.
+<!DOCTYPE html>
+<body>
+  <div id="root"></div>
+  <script src="path-to-embed-script.js"></script>
+</body>
+​
+Example implementation
+The following is a minimal implementation example of a server and website running the web chat with security and authentication configured. This implementation uses NodeJS with the Express web application framework.
+The project uses the following folder structure:
+.
+└── webchatProject/
+    ├── keys/
+    │   ├── example-jwtRS256.key
+    │   ├── example-jwtRS256.key.pub
+    │   └── ibmPublic.key.pub
+    ├── routes/
+    │   └── createJWT.js
+    ├── static/
+    │   └── index.html
+    ├── server.js
+    └── package.json
+You can generate the example-jwtRS256 keys with the following commands:
+ssh-keygen -t rsa -b 4096 -m PEM -f example-jwtRS256.key
+openssl rsa -in example-jwtRS256.key -pubout -outform PEM -out example-jwtRS256.key.pub
+And obtain the IBM public key by running the script provided in Enabling security.
+Use the following file contents as a reference for your implementation:
+
+createJWT.js
+
+index.html
+
+server.js
+/**
+ * JWT Creation Service for watsonx Orchestrate Secure Embed Chat
+ *
+ * This module handles the server-side creation of JSON Web Tokens (JWTs) for secure
+ * authentication with IBM watsonx Orchestrate embed chat. It demonstrates:
+ *
+ * 1. RS256 JWT signing using your private key
+ * 2. Optional user payload encryption using IBM's public key
+ * 3. Cookie-based anonymous user tracking
+ * 4. Session-based user information enrichment
+ *
+ * Security Notes:
+ * - Never expose your private key to the client side
+ * - Always generate JWTs server-side only
+ * - Use HTTPS in production environments
+ * - Adjust token expiration times based on your security requirements
+ */
+
+const fs = require("fs");
+const path = require("path");
+const express = require("express");
+const { v4: uuid } = require("uuid");
+const jwtLib = require("jsonwebtoken");
+const NodeRSA = require("node-rsa");
+
+const router = express.Router();
+
+/**
+ * Load your server-side RSA private key (PEM format)
+ *
+ * This key is used to sign JWTs with the RS256 algorithm. The corresponding public key
+ * must be uploaded to your watsonx Orchestrate instance security settings.
+ *
+ * IMPORTANT: Keep this file secure and never expose it to clients!
+ *
+ * Generate a new key pair using either method:
+ *
+ * Method 1 - Using ssh-keygen:
+ *   ssh-keygen -t rsa -b 4096 -m PEM -f example-jwtRS256.key
+ *   openssl rsa -in example-jwtRS256.key -pubout -outform PEM -out example-jwtRS256.key.pub
+ *
+ * Method 2 - Using openssl directly:
+ *   openssl genrsa -out example-jwtRS256.key 4096
+ *   openssl rsa -in example-jwtRS256.key -pubout -out example-jwtRS256.key.pub
+ */
+const PRIVATE_KEY_PATH = path.join(__dirname, "../keys/example-jwtRS256.key");
+if (!fs.existsSync(PRIVATE_KEY_PATH)) {
+  throw new Error(`Private key not found at ${PRIVATE_KEY_PATH}`);
+}
+const PRIVATE_KEY = fs.readFileSync(PRIVATE_KEY_PATH);
+
+/**
+ * Load IBM's RSA public key (PEM format)
+ *
+ * This key is provided by IBM watsonx Orchestrate and is used to encrypt the user_payload
+ * field in the JWT. This ensures that sensitive user information cannot be read by clients,
+ * as only IBM's servers can decrypt it.
+ *
+ * You can obtain this key by:
+ * 1. Running the wxo-embed-security-v4.sh script (recommended)
+ * 2. Calling the generate-key-pair API endpoint manually
+ *
+ * The encrypted payload will be decrypted server-side by watsonx Orchestrate.
+ */
+const IBM_PUBLIC_KEY_PATH = path.join(__dirname, "../keys/ibmPublic.key.pub");
+if (!fs.existsSync(IBM_PUBLIC_KEY_PATH)) {
+  throw new Error(`IBM public key not found at ${IBM_PUBLIC_KEY_PATH}`);
+}
+const IBM_PUBLIC_KEY = fs.readFileSync(IBM_PUBLIC_KEY_PATH);
+
+/**
+ * Cookie lifetime configuration
+ *
+ * This defines how long the anonymous user ID cookie will persist.
+ * Currently set to 60ms for demo purposes - in production, use a longer duration
+ * such as 45 days (45 * 24 * 60 * 60 * 1000 milliseconds).
+ */
+const TIME_45_DAYS = 60; // Demo value - replace with: 45 * 24 * 60 * 60 * 1000 for production
+
+/**
+ * Create a signed JWT string for the wxO embed chat client
+ *
+ * This function constructs a JWT with the following structure:
+ *
+ * @param {string} anonymousUserID - A stable identifier for anonymous users (from cookie)
+ * @param {object|null} sessionInfo - Optional authenticated user session data
+ *
+ * JWT Claims:
+ * - sub: Subject (user identifier) - should be a stable, unique ID for the user
+ * - user_payload: Encrypted user data that will be decrypted by watsonx Orchestrate
+ *   - name: User's display name
+ *   - custom_message: Any custom message or metadata
+ *   - custom_user_id: Your application's internal user ID
+ *   - sso_token: Single sign-on token if applicable
+ * - context: Additional context data accessible by the agent
+ *   - wxo_clientID: Your client/organization identifier
+ *   - wxo_name: User's name for display in chat
+ *   - wxo_role: User's role (e.g., Admin, User, Guest)
+ *
+ * @returns {string} A signed JWT token string
+ */
+function createJWTString(anonymousUserID, sessionInfo) {
+  // Base JWT claims structure
+  // Customize these fields based on your application's requirements
+  const jwtContent = {
+    // Subject: Unique identifier for the user
+    // In production, use a real user ID from your authentication system
+    sub: "FHYU235DD5", // Example value - replace with actual user ID
+    
+    // User payload: Will be encrypted with IBM's public key
+    // This data is sensitive and will only be readable by watsonx Orchestrate servers
+    user_payload: {
+      name: "Anonymous",
+      custom_message: "Encrypted message",
+      custom_user_id: "",
+      sso_token: "sso_token",
+    },
+    
+    // Context: Additional metadata accessible by the agent
+    // This data is NOT encrypted and can be read by the client
+    context: {
+      wxo_clientID: "865511",      // Your client/organization ID
+      wxo_name: "Ava",             // Display name in chat
+      wxo_role: "Admin",           // User role
+    },
+  };
+
+  // Enrich the JWT with authenticated session data if available
+  // In production, this would come from your authentication system
+  if (sessionInfo) {
+    jwtContent.user_payload.name = sessionInfo.userName;
+    jwtContent.user_payload.custom_user_id = sessionInfo.customUserID;
+  }
+
+  // Encrypt the user_payload using IBM's RSA public key
+  // This ensures sensitive user data cannot be read by clients
+  // Only watsonx Orchestrate servers can decrypt this data
+  if (jwtContent.user_payload) {
+    const rsaKey = new NodeRSA(IBM_PUBLIC_KEY);
+    const dataString = JSON.stringify(jwtContent.user_payload);
+    const utf8Data = Buffer.from(dataString, "utf-8");
+    // Encrypt and encode as base64 string
+    jwtContent.user_payload = rsaKey.encrypt(utf8Data, "base64");
+  }
+
+  // Sign the JWT using RS256 algorithm with your private key
+  // The token expiration should be set based on your security requirements
+  // Common values: "1h" (1 hour), "6h" (6 hours), "1d" (1 day)
+  const jwtString = jwtLib.sign(jwtContent, PRIVATE_KEY, {
+    algorithm: "RS256",
+    expiresIn: "10000000s", // Demo value - use shorter duration in production (e.g., "1h")
+  });
+
+  return jwtString;
+}
+
+/**
+ * Retrieve or create a stable anonymous user ID stored in a cookie
+ *
+ * This function ensures that anonymous users maintain a consistent identity across
+ * page refreshes and sessions. The ID is stored in a secure HTTP-only cookie.
+ *
+ * Benefits:
+ * - Prevents user identity from changing mid-session
+ * - Enables conversation continuity for anonymous users
+ * - Provides basic user tracking without requiring authentication
+ *
+ * @param {object} request - Express request object
+ * @param {object} response - Express response object
+ * @returns {string} The anonymous user ID
+ */
+function getOrSetAnonymousID(request, response) {
+  // Check if an anonymous ID already exists in cookies
+  let anonymousID = request.cookies["ANONYMOUS-USER-ID"];
+  
+  // Generate a new ID if none exists
+  if (!anonymousID) {
+    // Create a short, readable ID using UUID (first 5 characters for demo)
+    // In production, you might want to use the full UUID for better uniqueness
+    anonymousID = `anon-${uuid().slice(0, 5)}`;
+  }
+
+  // Set/refresh the cookie with each request to maintain the session
+  response.cookie("ANONYMOUS-USER-ID", anonymousID, {
+    expires: new Date(Date.now() + TIME_45_DAYS),
+    httpOnly: true,  // Prevents client-side JavaScript from accessing the cookie (security)
+    sameSite: "Lax", // Provides CSRF protection while allowing normal navigation
+    secure: false,   // Set to true in production when using HTTPS
+  });
+
+  return anonymousID;
+}
+
+/**
+ * Parse authenticated session information from cookies
+ *
+ * This function retrieves user session data if the user is authenticated.
+ * In a production application, you would:
+ * 1. Verify the session token/cookie
+ * 2. Fetch user information from your database or identity provider
+ * 3. Validate user permissions
+ *
+ * For this demo, we simply parse a JSON string from a cookie.
+ *
+ * @param {object} request - Express request object
+ * @returns {object|null} Session info object or null if not authenticated
+ */
+function getSessionInfo(request) {
+  const sessionInfo = request.cookies?.SESSION_INFO;
+  if (!sessionInfo) return null;
+  
+  try {
+    // Parse the JSON session data
+    return JSON.parse(sessionInfo);
+  } catch {
+    // Return null if parsing fails (invalid JSON)
+    return null;
+  }
+}
+
+/**
+ * Express route handler for JWT creation
+ *
+ * This endpoint is called by the client to obtain a fresh JWT token.
+ * The token is required for secure authentication with watsonx Orchestrate embed chat.
+ *
+ * Flow:
+ * 1. Retrieve or create an anonymous user ID (stored in cookie)
+ * 2. Check for authenticated session information
+ * 3. Generate a signed JWT with user data
+ * 4. Return the JWT as plain text response
+ *
+ * The client will include this JWT in the wxOConfiguration.token field
+ * when initializing the embed chat.
+ *
+ * @param {object} request - Express request object
+ * @param {object} response - Express response object
+ */
+function createJWT(request, response) {
+  // Ensure we have a stable user ID (anonymous or authenticated)
+  const anonymousUserID = getOrSetAnonymousID(request, response);
+  
+  // Get authenticated session data if available
+  const sessionInfo = getSessionInfo(request);
+
+  // Create and sign the JWT
+  const token = createJWTString(anonymousUserID, sessionInfo);
+  
+  // Return the JWT as plain text
+  response.send(token);
+}
+
+// Define the GET endpoint that returns a signed JWT string
+// This endpoint is called by the client before initializing the chat
+router.get("/", createJWT);
+
+module.exports = router;
+See all 257 lines
+​
+Using the chat APIs
+​
+Instance methods
+Instance methods enable your code to interact with or modify an active chat instance at run time. They provide a way to programmatically control the behavior and state of the embedded chat component after it has been initialized based on user actions, application logic, or external events.
+For more information, see Instance methods.
+​
+Events
+Embedded web chat supports a variety of events that allow you to trigger specific actions or customize behavior.
+For more information, see Events.
+​
+Agent completions API
+You can also integrate your agent with external applications by using the ADK’s provided agent completions API. These APIs allow agents to be shared across multiple watsonx Orchestrate instances:
+Orchestrate Native Runs API: For long-duration workflows.
+API Documentation:
+Non streaming Runs API
+Streaming Runs API
+Chat Completions Compatibility Layer: OpenAI-compatible for easy integration.
+API Documentation:
+Chat Completions API
+​
+Customizing the chat UI
+​
+Using context variables
+To use context variables in embedded chat, include them inside the JWT token. You can add context variables to a JWT token by using a JavaScript script. See Context variables for more details.
+​
+Custom styling and layout
+The chat supports a flexible layout object that enables you to control how and where the chat UI appears on the page. See Customizing layout and Customizing styles for more details.
+​
+Enable feedback
+By default, thumbs-up and thumbs-down feedback options are disabled. You need to enable them manually to collect user input on responses. See Thumbs up and thumbs down feedback for more details.

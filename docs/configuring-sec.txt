@@ -1,0 +1,55 @@
+Configuring security for embedded chat
+Last Updated
+: 2026-02-12
+Security for embedded chat is enabled by default at the instance level, but it is not active until you explicitly configure the required cryptographic assets and register them with your instance. You might be able to see the chat widget in the web application, but it does not initialize until this configuration is completed successfully.
+
+This procedure assumes that you understand public and private key cryptography and are responsible for securely managing private keys in your deployment environment. Before you begin configuring security, it is helpful to understand the underlying security concepts. For more information, see Securing the embedded chat.
+
+Prerequisites
+Before you begin, ensure that you have the following resources:
+
+An active watsonx Orchestrate instance.
+A RS256 public and private key pair. You can use a tool such as OpenSSL to generate the key pairs.
+For example, to generate RSA 4096‑bit keys (RS256) with OpenSSL, you might use the following command prompt:
+
+Generate a 4096‑bit private key:
+openssl genpkey \
+  -algorithm RSA \
+  -pkeyopt rsa_keygen_bits:4096 \
+  -out private.pem
+
+The command creates a PKCS#8 private key. The private key remains under your control and must be protected by using industry‑standard secret management practice.
+
+Extract the public key:
+openssl rsa \
+  -in private.pem \
+  -pubout \
+  -out public.pem
+
+The command creates the public key that is used to validate RS256 JWT signatures. Make sure these keys are accessible only by your server code.
+
+Configuring security
+To enable or disable security for the embedded chat, complete the following steps:
+
+Log in to your watsonx Orchestrate instance.
+
+Click your profile icon, and go to Settings > Embed Security tab.
+
+Set the Security switch to On to enable security.
+
+In the Public key field, paste the client public key.
+
+watsonx Orchestrate uses the public key to verify that incoming requests originate from your website.
+
+If you want to disable security, set the Security switch to Off. Disable security only when anonymous access is explicitly required, such as public demonstrations, anonymous chat use cases, and low risk environments with no access to sensitive systems or data. For more information, see the Security disabled section.
+
+Results
+After you enable security, the following actions occur:
+
+A client-owned key pair is generated locally by using OpenSSL.
+An IBM-managed key pair is generated and securely stored with watsonx Orchestrate service.
+Both public keys are registered with the watsonx Orchestrate service.
+Embedded chat security is enabled for your instance.
+This configuration enforces authenticated, signed communication between your embedded client and watsonx Orchestrate.
+
+Security note:Never commit private keys to source control. Store the client private key securely by using your organization’s secrets management solution.
